@@ -4,17 +4,35 @@ services:
     container_name: task-manager-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
       MYSQL_DATABASE: task_manager_db
+      MYSQL_USER: task_manager
+      MYSQL_PASSWORD: ${DB_PASSWORD:-task_manager_password}
     ports:
       - "3306:3306"
     volumes:
       - task_manager_mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -utask_manager -p$${MYSQL_PASSWORD} --silent"]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  api:
+    build: .
+    container_name: task-manager-api
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/task_manager_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USERNAME: task_manager
+      DB_PASSWORD: ${DB_PASSWORD:-task_manager_password}
+      JWT_SECRET: ${JWT_SECRET:-change-this-development-secret-key-with-at-least-32-characters}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+    ports:
+      - "8080:8080"
 
 volumes:
   task_manager_mysql_data:
